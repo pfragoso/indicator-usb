@@ -11,7 +11,7 @@ class Monitor:
     drives = {}
     ejecting = ''
     main = None
-    show_hdd = False
+    show_hdd = True
     show_net = True
     
     def __init__(self, main):
