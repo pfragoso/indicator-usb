@@ -60,7 +60,12 @@ class Main:
     menu = None
     
     def __init__(self):
-        self.ind = appindicator.Indicator('indicator-usb', 'indicator-usb-panel', appindicator.CATEGORY_HARDWARE)
+        #if running from source directory set a known icon
+        if os.path.exists("icon.png"):
+            icon = 'image-missing'
+        else:
+            icon = 'indicator-usb-panel'
+        self.ind = appindicator.Indicator('indicator-usb', icon, appindicator.CATEGORY_HARDWARE)
         self.ind.set_status(appindicator.STATUS_PASSIVE)
 
         self.mon = Monitor(self)
