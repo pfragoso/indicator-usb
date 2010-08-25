@@ -30,9 +30,11 @@ class Monitor:
     
     def add_drive(self, s, d):
         if d.is_user_visible() and d.is_mounted():
-            if (d.get_device_path().startswith('/dev/') and self.show_hdd) \
-               or (d.get_device_path().startswith('//') and self.show_net) :
-                self.drives[d.get_device_path()] = d    
+            dp = d.get_device_path()
+            if dp:
+                if (dp.startswith('/dev/') and self.show_hdd) \
+                   or (dp.startswith('//') and self.show_net) :
+                    self.drives[dp] = d
         self.main.update()
         
     def del_drive(self, s, d):
