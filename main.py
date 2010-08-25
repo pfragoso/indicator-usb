@@ -6,29 +6,35 @@ import gnomevfs
 import pynotify
 import os
 
-class Monitor:
+class _Monitor:
     mon = None
     drives = {}
     ejecting = ''
     main = None
     show_hdd = True
     show_net = True
+
+    def init(self):
+        raise NotImplementedError
+
+    def refresh(self):
+        raise NotImplementedError
+
+    def eject(self, s, d):
+        raise NotImplementedError
+
+class Monitor(_Monitor):
     
     def __init__(self, main):
         self.main = main
 
     def init(self):
         self.mon = gnomevfs.VolumeMonitor()
-        self.mon.connect('volume-mounted', self.add_drive)
-        self.mon.connect('volume-unmounted', self.del_drive)
+        self.mon.connect('volume-mounted', self._add_drive)
+        self.mon.connect('volume-unmounted', self._del_drive)
         self.refresh()
-                    
-    def refresh(self):
-        self.drives = {}
-        for d in self.mon.get_mounted_volumes():
-            self.add_drive(None, d)
-    
-    def add_drive(self, s, d):
+
+    def _add_drive(self, s, d):
         if d.is_user_visible() and d.is_mounted():
             dp = d.get_device_path()
             if dp:
@@ -36,24 +42,29 @@ class Monitor:
                    or (dp.startswith('//') and self.show_net) :
                     self.drives[dp] = d
         self.main.update()
-        
-    def del_drive(self, s, d):
+
+    def _del_drive(self, s, d):
         for k in self.drives:
             if k == d.get_device_path():
                 self.drives.pop(k)
                 self.main.update()
                 return
-            
-    def eject(self, s, d):
-        self.ejecting = d
-        d.eject(self.eject_cb)
-        self.del_drive(None, d)
-        
-    def eject_cb(self, x, d):
+
+    def _eject_cb(self, x, d):
         d = self.ejecting
         n = pynotify.Notification('Device can be removed now', d.get_display_name(), d.get_icon())
         n.show()
-        
+
+    def refresh(self):
+        self.drives = {}
+        for d in self.mon.get_mounted_volumes():
+            self._add_drive(None, d)
+
+    def eject(self, s, d):
+        self.ejecting = d
+        d.eject(self._eject_cb)
+        self._del_drive(None, d)
+
 class Main:
     mon = None
     ind = None
