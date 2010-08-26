@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 import gobject
 import gtk
+import gio
 import appindicator
 import gnomevfs
 import pynotify
@@ -65,6 +66,44 @@ class Monitor(_Monitor):
         d.eject(self._eject_cb)
         self._del_drive(None, d)
 
+class GIOMonitor(_Monitor):
+
+    drives = []
+
+    def __init__(self, main):
+        self.main = main
+
+    def init(self):
+        self.mon = gio.VolumeMonitor()
+        self.mon.connect('mount-added', self._add_drive)
+        self.mon.connect('mount-removed', self._del_drive)
+        self.refresh()
+
+    def _add_drive(self, s, m):
+        if m.can_unmount():
+            root = m.get_root()
+            if (root.get_uri_scheme() == "file" and self.show_hdd) \
+               or (not root.is_native() and self.show_net) :
+                self.drives.append(m)
+        self.main.update()
+
+    def _del_drive(self, s, d):
+        self.drives.remove(d)
+        self.main.update()
+
+    def refresh(self):
+        self.drives = []
+        for m in self.mon.get_mounts():
+            self._add_drive(None, m)
+
+    def _eject_cb(self, m, result):
+        #FIXME: pynotify does not support gicon
+        n = pynotify.Notification('Device can be removed now', m.get_name())
+        n.show()
+
+    def eject(self, s, m):
+        m.unmount(self._eject_cb)
+
 class Main:
     mon = None
     ind = None
@@ -79,7 +118,7 @@ class Main:
         self.ind = appindicator.Indicator('indicator-usb', icon, appindicator.CATEGORY_HARDWARE)
         self.ind.set_status(appindicator.STATUS_PASSIVE)
 
-        self.mon = Monitor(self)
+        self.mon = GIOMonitor(self)
 
         try:
             ss = open(os.path.expanduser('~/.config/indicator-usb')).read().split('\n')
@@ -90,7 +129,7 @@ class Main:
         
         self.mon.init()
         self.save_config()
-           
+
     def save_config(self):
         s = ''
         with open(os.path.expanduser('~/.config/indicator-usb'), 'w') as f:
@@ -118,14 +157,10 @@ class Main:
         smi.show()
         self.menu.append(smi)
         
-        for k in self.mon.drives:
-            i = self.mon.drives[k]
-            mi = gtk.ImageMenuItem(i.get_display_name())
-            try:
-                mi.set_image(gtk.image_new_from_stock(i.get_drive().get_icon(), gtk.ICON_SIZE_MENU))
-            except:
-                mi.set_image(gtk.image_new_from_stock(i.get_icon(), gtk.ICON_SIZE_MENU))
-                
+        for i in self.mon.drives:
+            mi = gtk.ImageMenuItem(i.get_name())
+            #FIXME: gicon does not work...
+            mi.set_image(gtk.image_new_from_gicon(i.get_icon(), gtk.ICON_SIZE_MENU))
             self.menu.append(mi)
             mi.show()
             mi.connect('activate', self.mon.eject, i)
