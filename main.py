@@ -6,6 +6,18 @@ import appindicator
 import pynotify
 import os
 
+#YUCK: gtk.image_new_from_gicon does not work, and pynotify does
+#not support gicon, so just let the theme choose the icon
+def _get_icon_name_from_gicon(gicon):
+    assert type(gicon) == gio.ThemedIcon
+    name = "image-missing"
+    theme = gtk.icon_theme_get_default()
+    for n in gicon.get_names():
+        if theme.lookup_icon(n, gtk.icon_size_lookup(gtk.ICON_SIZE_MENU)[0], 0):
+            name = n
+            break
+    return n
+
 class Monitor:
 
     mon = None
@@ -41,8 +53,8 @@ class Monitor:
             self._add_drive(None, m)
 
     def _eject_cb(self, m, result):
-        #FIXME: pynotify does not support gicon
-        n = pynotify.Notification('Device can be removed now', m.get_name())
+        #XXX: pynotify does not support gicon
+        n = pynotify.Notification('Device can be removed now', m.get_name(), _get_icon_name_from_gicon(m.get_icon()))
         n.show()
 
     def eject(self, s, m):
@@ -103,8 +115,8 @@ class Main:
         
         for i in self.mon.drives:
             mi = gtk.ImageMenuItem(i.get_name())
-            #FIXME: gicon does not work...
-            mi.set_image(gtk.image_new_from_gicon(i.get_icon(), gtk.ICON_SIZE_MENU))
+            #XXX: gicon does not work...
+            mi.set_image(gtk.image_new_from_stock(_get_icon_name_from_gicon(i.get_icon()), gtk.ICON_SIZE_MENU))
             self.menu.append(mi)
             mi.show()
             mi.connect('activate', self.mon.eject, i)
