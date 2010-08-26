@@ -3,72 +3,16 @@ import gobject
 import gtk
 import gio
 import appindicator
-import gnomevfs
 import pynotify
 import os
 
-class _Monitor:
+class Monitor:
+
     mon = None
-    drives = {}
-    ejecting = ''
+    drives = []
     main = None
     show_hdd = True
     show_net = True
-
-    def init(self):
-        raise NotImplementedError
-
-    def refresh(self):
-        raise NotImplementedError
-
-    def eject(self, s, d):
-        raise NotImplementedError
-
-class Monitor(_Monitor):
-    
-    def __init__(self, main):
-        self.main = main
-
-    def init(self):
-        self.mon = gnomevfs.VolumeMonitor()
-        self.mon.connect('volume-mounted', self._add_drive)
-        self.mon.connect('volume-unmounted', self._del_drive)
-        self.refresh()
-
-    def _add_drive(self, s, d):
-        if d.is_user_visible() and d.is_mounted():
-            dp = d.get_device_path()
-            if dp:
-                if (dp.startswith('/dev/') and self.show_hdd) \
-                   or (dp.startswith('//') and self.show_net) :
-                    self.drives[dp] = d
-        self.main.update()
-
-    def _del_drive(self, s, d):
-        for k in self.drives:
-            if k == d.get_device_path():
-                self.drives.pop(k)
-                self.main.update()
-                return
-
-    def _eject_cb(self, x, d):
-        d = self.ejecting
-        n = pynotify.Notification('Device can be removed now', d.get_display_name(), d.get_icon())
-        n.show()
-
-    def refresh(self):
-        self.drives = {}
-        for d in self.mon.get_mounted_volumes():
-            self._add_drive(None, d)
-
-    def eject(self, s, d):
-        self.ejecting = d
-        d.eject(self._eject_cb)
-        self._del_drive(None, d)
-
-class GIOMonitor(_Monitor):
-
-    drives = []
 
     def __init__(self, main):
         self.main = main
@@ -118,7 +62,7 @@ class Main:
         self.ind = appindicator.Indicator('indicator-usb', icon, appindicator.CATEGORY_HARDWARE)
         self.ind.set_status(appindicator.STATUS_PASSIVE)
 
-        self.mon = GIOMonitor(self)
+        self.mon = Monitor(self)
 
         try:
             ss = open(os.path.expanduser('~/.config/indicator-usb')).read().split('\n')
